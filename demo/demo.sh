@@ -312,7 +312,7 @@ switchover() {
   say "Step 1/4: demote db1 (read_only ON -> primary health fails)"
   sql db1 "SET GLOBAL read_only=1"
   sql db1 "SET GLOBAL super_read_only=1" 2>/dev/null \
-    || note "super_read_only unsupported on MariaDB; read_only=1 already blocks all writers"
+    || note "super_read_only is MySQL-only; on MariaDB, plain read_only still lets SUPER users write"
   wait_for db1 health/primary 503 "db1 /health/primary"
   note "HAProxy drops db1 from both backends: it is quarantined, not split-brain"
 

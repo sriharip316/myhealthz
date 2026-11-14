@@ -102,8 +102,9 @@ func (c *Collector) collectReadOnly(ctx context.Context, f *Facts) error {
 	}
 	f.ReadOnly = ro != 0
 
-	// MariaDB has no super_read_only; its read_only already blocks SUPER
-	// users, so treating it as unsupported is safe.
+	// super_read_only is MySQL-only (5.7.8+); MariaDB has no such variable.
+	// Treating the unknown-variable error as "off" is safe: the health
+	// decision then keys on read_only alone.
 	var sro int
 	err := c.db.QueryRowContext(ctx, "SELECT @@super_read_only").Scan(&sro)
 	switch {
@@ -112,7 +113,7 @@ func (c *Collector) collectReadOnly(ctx context.Context, f *Facts) error {
 		f.SuperReadOnly = sro != 0
 	case isMySQLError(err, 1193): // ER_UNKNOWN_SYSTEM_VARIABLE
 		if c.superROUnknownLog.CompareAndSwap(false, true) {
-			log.Printf("myhealthz: server does not support super_read_only (MariaDB); relying on read_only")
+			log.Printf("myhealthz: server does not support super_read_only (MariaDB, or MySQL <5.7.8); relying on read_only")
 		}
 	default:
 		return err

@@ -114,9 +114,11 @@ their connection lifetime (5 minutes).
 
 ## MySQL vs MariaDB compatibility
 
-- `super_read_only` is MySQL-only; on MariaDB (where plain `read_only`
-  already blocks privileged users) the query failure is detected once,
-  logged, and treated as off.
+- `super_read_only` is MySQL-only (added in MySQL 5.7.8); MariaDB has no
+  such variable, so the query failure is detected once, logged, and
+  treated as off. Plain `read_only` never stops `SUPER` users from
+  writing on MariaDB (or MySQL) — treat it as an advisory role signal,
+  not a write-enforcement boundary.
 - `SHOW REPLICA STATUS` is tried first and falls back to
   `SHOW SLAVE STATUS` on a syntax error (old servers).
 - Replica status columns are looked up **by name**, accepting both the
