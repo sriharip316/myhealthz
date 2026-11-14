@@ -1,8 +1,8 @@
 # myhealthz
 
 HTTP health check server for **MySQL** and **MariaDB** that answers one
-question for load balancers: *is this server the **primary** or a
-**replica** right now?*
+question for load balancers: _is this server the **primary** or a
+**replica** right now?_
 
 Run it next to a database (sidecar or plain process), point HAProxy /
 kube-proxy / any HTTP prober at it, and route writes to primaries and
@@ -10,12 +10,12 @@ reads to replicas — safely, even across switchover.
 
 ## Endpoints
 
-| Endpoint          | 200 when                                            | 503 when                          |
-| ----------------- | --------------------------------------------------- | --------------------------------- |
-| `GET /health/primary` | the server is the primary (see below)            | anything else, incl. DB errors    |
-| `GET /health/replica`  | the server is a healthy replica (see below)      | anything else, incl. DB errors    |
-| `GET /status`     | always 200: full facts + decision + reasons         | —                                 |
-| `GET /healthz`    | always 200 (process liveness)                       | —                                 |
+| Endpoint              | 200 when                                    | 503 when                       |
+| --------------------- | ------------------------------------------- | ------------------------------ |
+| `GET /health/primary` | the server is the primary (see below)       | anything else, incl. DB errors |
+| `GET /health/replica` | the server is a healthy replica (see below) | anything else, incl. DB errors |
+| `GET /status`         | always 200: full facts + decision + reasons | —                              |
+| `GET /healthz`        | always 200 (process liveness)               | —                              |
 
 Responses are JSON and include the reasons behind the verdict:
 
@@ -54,7 +54,7 @@ Role transitions are logged, so a switchover is visible in `podman logs`.
 Anything else — a demoted old primary, a promoted node whose replicas
 haven't reconnected yet, a replica with a stopped thread — is **neither**
 (503 on both endpoints). That is deliberate: during a switchover the
-write backend should have *no* healthy server rather than two.
+write backend should have _no_ healthy server rather than two.
 
 ## Connecting to the database
 
@@ -125,8 +125,8 @@ an HTTP-check write backend (`/health/primary`) and read backend
 (`/health/replica`):
 
 ```
-                       ┌─────────┐  :13307 write ─┐
- clients ──> haproxy ──┤  stats   │  :13308 read ──┼──> db1 (primary)
+                       ┌─────────┐  :13307 write ─────> db1 (primary)
+ clients ──> haproxy ──┤  stats  │  :13308 read  ──┐
                        └─────────┘                 ├──> db2 (replica)
                                                    └──> db3 (replica)
 ```
