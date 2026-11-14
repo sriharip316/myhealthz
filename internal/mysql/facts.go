@@ -46,10 +46,12 @@ const (
 
 // Collector gathers Facts from a server on demand.
 type Collector struct {
-	db                *sql.DB
-	queryTimeout      time.Duration
-	replicaStmt       atomic.Value // string
-	superROUnknownLog atomic.Bool
+	db           *sql.DB
+	queryTimeout time.Duration
+	replicaStmt  atomic.Value // string
+	// superROUnknownLog and zeroReplicasWarned gate one-time log lines.
+	superROUnknownLog  atomic.Bool
+	zeroReplicasWarned atomic.Bool
 }
 
 // NewCollector wraps a *sql.DB opened with Open.
@@ -70,7 +72,7 @@ func (c *Collector) Facts(ctx context.Context) (*Facts, error) {
 	}
 	rs, err := c.replicaStatus(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("replica status: %w", err)
+		return nil, fmt.Errorf("replica status: %w", wrapReplicaStatusErr(err))
 	}
 	if rs != nil {
 		f.ReplicaConfigured = true
@@ -81,6 +83,14 @@ func (c *Collector) Facts(ctx context.Context) (*Facts, error) {
 	}
 	if err := c.db.QueryRowContext(ctx, countReplicasSQL).Scan(&f.ConnectedReplicas); err != nil {
 		return nil, fmt.Errorf("connected replicas: %w", err)
+	}
+	// A writable server that is not a replica should have connected
+	// replicas. If it reports none, the likeliest non-obvious cause is a
+	// missing PROCESS privilege: the count query succeeds but cannot see
+	// the replicas' binlog dump threads. Log once per process.
+	if f.ConnectedReplicas == 0 && !f.ReadOnly && !f.SuperReadOnly && !f.ReplicaConfigured &&
+		c.zeroReplicasWarned.CompareAndSwap(false, true) {
+		log.Printf("myhealthz: warning: writable server that is not a replica reports 0 connected replicas; if replicas should be connected, the monitor user likely lacks the PROCESS privilege and cannot see their binlog dump threads (see README: Required database privileges)")
 	}
 	return f, nil
 }

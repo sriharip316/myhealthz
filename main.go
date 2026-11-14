@@ -46,19 +46,27 @@ func run(args []string) error {
 	}
 	defer db.Close()
 
+	collector := mysql.NewCollector(db, cfg.QueryTimeout)
+
 	pingCtx, cancel := context.WithTimeout(context.Background(), cfg.ConnectTimeout)
 	defer cancel()
 	if err := db.PingContext(pingCtx); err != nil {
 		// Not fatal: the sidecar should come up before the database and
-		// report 503 until the checks succeed.
+		// report 503 until the checks succeed. The privilege preflight is
+		// skipped; per-request errors carry the same remediation hints.
 		log.Printf("myhealthz: warning: database not reachable yet (%v); serving 503s until it is", err)
 	} else {
 		log.Printf("myhealthz: database reachable")
+		preCtx, preCancel := context.WithTimeout(context.Background(), cfg.QueryTimeout)
+		defer preCancel()
+		if err := collector.CheckPrivileges(preCtx); err != nil {
+			log.Printf("myhealthz: WARNING: monitor user privileges incomplete: %v", err)
+		}
 	}
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           httpserver.New(mysql.NewCollector(db, cfg.QueryTimeout), cfg.MinReplicas, cfg.MaxLagSeconds).Handler(),
+		Handler:           httpserver.New(collector, cfg.MinReplicas, cfg.MaxLagSeconds).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	errCh := make(chan error, 1)

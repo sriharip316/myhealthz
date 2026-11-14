@@ -106,6 +106,12 @@ Grant these before starting myhealthz — MariaDB evaluates some
 privileges per connection, so grants may not apply to already-open
 connections.)
 
+myhealthz validates these privileges once at startup (when the database
+is already reachable) and logs remediation hints if they are missing.
+Until the grants are fixed, the health endpoints return 503 with the
+same hint; once granted, connections pick the new privileges up within
+their connection lifetime (5 minutes).
+
 ## MySQL vs MariaDB compatibility
 
 - `super_read_only` is MySQL-only; on MariaDB (where plain `read_only`
