@@ -1,0 +1,75 @@
+// myhealthz is an HTTP health check server for MySQL and MariaDB that tells
+// load balancers whether the local server is acting as primary or replica.
+package main
+
+import (
+	"context"
+	"errors"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/sriharip316/myhealthz/internal/config"
+	"github.com/sriharip316/myhealthz/internal/httpserver"
+	"github.com/sriharip316/myhealthz/internal/mysql"
+)
+
+func main() {
+	if err := run(os.Args[1:]); err != nil {
+		log.Fatalf("myhealthz: %v", err)
+	}
+}
+
+func run(args []string) error {
+	cfg, err := config.Parse(args)
+	if err != nil {
+		return err
+	}
+
+	ep := mysql.ResolveEndpoint(cfg)
+	log.Printf("myhealthz: checking %s (chosen via %s)", ep, ep.Source)
+
+	db, err := mysql.Open(cfg, ep)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	pingCtx, cancel := context.WithTimeout(context.Background(), cfg.ConnectTimeout)
+	defer cancel()
+	if err := db.PingContext(pingCtx); err != nil {
+		// Not fatal: the sidecar should come up before the database and
+		// report 503 until the checks succeed.
+		log.Printf("myhealthz: warning: database not reachable yet (%v); serving 503s until it is", err)
+	} else {
+		log.Printf("myhealthz: database reachable")
+	}
+
+	srv := &http.Server{
+		Addr:              cfg.ListenAddr,
+		Handler:           httpserver.New(mysql.NewCollector(db, cfg.QueryTimeout), cfg.MinReplicas, cfg.MaxLagSeconds).Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	errCh := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+	log.Printf("myhealthz: listening on %s", cfg.ListenAddr)
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	select {
+	case err := <-errCh:
+		return err
+	case sig := <-sigCh:
+		log.Printf("myhealthz: received %s, shutting down", sig)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return srv.Shutdown(shutdownCtx)
+	}
+}

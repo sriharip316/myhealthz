@@ -1,0 +1,6 @@
+.git
+bin/
+demo/
+.gitignore
+.dockerignore
+Makefile
