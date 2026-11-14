@@ -65,7 +65,9 @@ func Open(cfg *config.Config, ep Endpoint) (*sql.DB, error) {
 			return nil, err
 		}
 		if tlsConf != nil {
-			gomysql.RegisterTLSConfig(tlsConfigName, tlsConf)
+			if err := gomysql.RegisterTLSConfig(tlsConfigName, tlsConf); err != nil {
+				return nil, fmt.Errorf("register TLS config: %w", err)
+			}
 			mc.TLSConfig = tlsConfigName
 		}
 	}

@@ -145,6 +145,23 @@ to db2 and db2's `/health/primary` turns 200, then rejoin db1 as a
 replica. Ports: `1306N` dbN MySQL, `1808N` sidecar HTTP, `13307`/`13308`
 write/read, `19080` HAProxy stats.
 
+## Install
+
+**Container image** — multi-arch (linux amd64/arm64), published to GHCR on
+tagged releases:
+
+```console
+$ podman run --network host ghcr.io/sriharip316/myhealthz:latest
+```
+
+**Standalone binaries** — static, linux and macOS (amd64/arm64), attached to
+each [release](https://github.com/sriharip316/myhealthz/releases) as
+`myhealthz_<version>_<os>_<arch>.tar.gz`, along with `checksums.txt`:
+
+```console
+$ tar -xzf myhealthz_0.1.0_linux_amd64.tar.gz && ./myhealthz
+```
+
 ## Build
 
 ```console

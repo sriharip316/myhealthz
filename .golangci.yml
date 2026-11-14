@@ -1,0 +1,8 @@
+version: "2"
+
+linters:
+  exclusions:
+    presets:
+      # Ignored unchecked errors from the standard library's idiomatic
+      # best-effort calls: deferred Close, Flush, print helpers, etc.
+      - std-error-handling
