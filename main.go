@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -17,6 +18,9 @@ import (
 	"github.com/sriharip316/myhealthz/internal/mysql"
 )
 
+// version is set at build time via -ldflags "-X main.version=...".
+var version = "dev"
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		log.Fatalf("myhealthz: %v", err)
@@ -27,6 +31,10 @@ func run(args []string) error {
 	cfg, err := config.Parse(args)
 	if err != nil {
 		return err
+	}
+	if cfg.Version {
+		fmt.Printf("myhealthz version %s\n", version)
+		return nil
 	}
 
 	ep := mysql.ResolveEndpoint(cfg)

@@ -68,6 +68,7 @@ jobs:
         with:
           context: .
           file: ./Containerfile
+          build-args: version=${{ steps.meta.outputs.version }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -105,7 +106,7 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           mkdir -p dist
-          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o dist/myhealthz .
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${version}" -o dist/myhealthz .
           tar -czf "dist/myhealthz_${version}_${{ matrix.os }}_${{ matrix.arch }}.tar.gz" -C dist myhealthz
 
       - name: Upload artifact

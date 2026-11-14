@@ -89,6 +89,7 @@ The chosen endpoint and its source are logged at startup.
 -tls-ca-file string   CA bundle to verify the server certificate
 -tls-server-name ...  expected server name in the certificate
 -tls-cert-file / -tls-key-file   client certificate for mutual TLS
+-version               print version and exit
 ```
 
 ### Required database privileges

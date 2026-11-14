@@ -11,6 +11,7 @@ import (
 
 // Config holds every runtime setting for myhealthz.
 type Config struct {
+	Version        bool
 	ListenAddr     string
 	Host           string
 	Port           int
@@ -49,6 +50,7 @@ func Parse(args []string) (*Config, error) {
 	fs.StringVar(&cfg.TLSServerName, "tls-server-name", "", "expected server name in the server certificate (requires -tls)")
 	fs.StringVar(&cfg.TLSCertFile, "tls-cert-file", "", "client certificate for mutual TLS (requires -tls)")
 	fs.StringVar(&cfg.TLSKeyFile, "tls-key-file", "", "client key for mutual TLS (requires -tls)")
+	fs.BoolVar(&cfg.Version, "version", false, "print version and exit")
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
