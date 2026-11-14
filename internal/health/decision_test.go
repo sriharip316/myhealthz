@@ -142,3 +142,12 @@ func TestDecide(t *testing.T) {
 		})
 	}
 }
+
+func TestDecideNilFactsFailsClosed(t *testing.T) {
+	// A nil snapshot must not panic and must classify as neither, so a
+	// misbehaving provider quarantines the node instead of crashing it.
+	d := Decide(nil, 1, -1)
+	if d.Primary || d.Replica {
+		t.Fatalf("Primary = %v, Replica = %v, want both false", d.Primary, d.Replica)
+	}
+}

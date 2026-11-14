@@ -84,6 +84,11 @@ func (s *Server) handleHealth(endpoint string) http.HandlerFunc {
 			})
 			return
 		}
+		if facts == nil {
+			// Provider returned (nil, nil): treat as "no facts" rather than
+			// dereferencing nil. Zero facts fail closed as "neither".
+			facts = &mysql.Facts{}
+		}
 		d := health.Decide(facts, s.minReplicas, s.maxLag)
 		ok, reasons := d.Primary, d.PrimaryReasons
 		if endpoint == "replica" {
@@ -114,6 +119,11 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		resp.Error = err.Error()
 		writeJSON(w, http.StatusOK, resp)
 		return
+	}
+	if facts == nil {
+		// Provider returned (nil, nil): treat as "no facts" rather than
+		// dereferencing nil. Zero facts fail closed as "neither".
+		facts = &mysql.Facts{}
 	}
 	d := health.Decide(facts, s.minReplicas, s.maxLag)
 	resp.OK = d.Primary || d.Replica

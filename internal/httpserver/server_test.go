@@ -112,6 +112,41 @@ func TestHealthEndpointsOnDBError(t *testing.T) {
 	}
 }
 
+func TestHealthEndpointsOnNilFacts(t *testing.T) {
+	// A provider returning (nil, nil) — no error, no facts — must fail
+	// closed rather than panic in health.Decide.
+	ts := newTestServer(&fakeProvider{})
+	defer ts.Close()
+
+	for _, path := range []string{"/health/primary", "/health/replica"} {
+		resp, err := http.Get(ts.URL + path)
+		if err != nil {
+			t.Fatalf("%s: %v (a handler panic surfaces as a connection error)", path, err)
+		}
+		var body HealthResponse
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusServiceUnavailable || body.OK || body.Role != "none" || body.Facts == nil {
+			t.Fatalf("%s: status = %d, body = %+v, want 503 with role \"none\"", path, resp.StatusCode, body)
+		}
+	}
+
+	resp, err := http.Get(ts.URL + "/status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body StatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || body.OK || body.Role != "none" || body.Decision == nil {
+		t.Fatalf("status: code = %d, body = %+v, want 200 with role \"none\" and a decision", resp.StatusCode, body)
+	}
+}
+
 func TestStatusEndpointAlways200(t *testing.T) {
 	ts := newTestServer(&fakeProvider{err: fmt.Errorf("boom")})
 	defer ts.Close()

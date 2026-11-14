@@ -29,6 +29,11 @@ type Decision struct {
 // "do not route traffic here".
 func Decide(f *mysql.Facts, minReplicas, maxLagSeconds int) Decision {
 	var d Decision
+	if f == nil {
+		// Nil snapshot (e.g. a provider returning (nil, nil)): treat as no
+		// facts, which fails closed as "neither" below.
+		f = &mysql.Facts{}
+	}
 	readOnly := f.ReadOnly || f.SuperReadOnly
 
 	if readOnly {

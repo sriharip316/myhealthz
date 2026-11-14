@@ -64,10 +64,19 @@ func run(args []string) error {
 		}
 	}
 
+	// ReadTimeout/WriteTimeout/IdleTimeout are required alongside
+	// ReadHeaderTimeout: with them zero, idle keep-alive connections (and the
+	// goroutine + fd behind each) are never reaped. WriteTimeout covers
+	// handler execution, which Facts bounds under a single -query-timeout
+	// context, so it must stay above that value.
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           httpserver.New(collector, cfg.MinReplicas, cfg.MaxLagSeconds).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 16,
 	}
 	errCh := make(chan error, 1)
 	go func() {
