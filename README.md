@@ -152,6 +152,14 @@ to db2 and db2's `/health/primary` turns 200, then rejoin db1 as a
 replica. Ports: `1306N` dbN MySQL, `1808N` sidecar HTTP, `13307`/`13308`
 write/read, `19080` HAProxy stats.
 
+**Note on the polling rate:** the demo's `demo/haproxy.cfg` health-checks
+every node every **500 ms** (`inter 500ms`, with `fall 1`) so failovers
+are visible within a second. Each check makes the node's sidecar run 4
+SQL queries, so the two backends together put ~16 queries/s on every
+database. That is deliberately aggressive for a laptop demo — **do not
+copy it to production**. Use a longer interval (e.g. `inter 2s`–`5s`)
+and size `fall`/`rise` to match your switchover SLA.
+
 ## Install
 
 **Container image** — multi-arch (linux amd64/arm64), published to GHCR on
