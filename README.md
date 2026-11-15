@@ -179,6 +179,104 @@ each [release](https://github.com/sriharip316/myhealthz/releases) as
 $ tar -xzf myhealthz_0.1.0_linux_amd64.tar.gz && ./myhealthz
 ```
 
+### systemd service
+
+For bare-metal/VM installs, run the static binary under systemd — one
+instance per database node, with the load balancer probing each node's
+`-listen` address (`/health/primary`, `/health/replica`).
+
+**1. Binary and dedicated user**
+
+```console
+$ sudo install -m 0755 bin/myhealthz /usr/local/bin/myhealthz
+$ sudo useradd --system --no-create-home --shell /usr/sbin/nologin myhealthz
+```
+
+**2. Password file** — for the monitor user created in
+[Required database privileges](#required-database-privileges); don't run
+the service as `root`:
+
+```console
+$ sudo install -d -m 0750 -o root -g myhealthz /etc/myhealthz
+$ sudo install -m 0640 -o root -g myhealthz /dev/null /etc/myhealthz/db-password
+$ echo '<password>' | sudo tee /etc/myhealthz/db-password >/dev/null
+```
+
+(`-password-file` trims a trailing newline, so `echo` is fine.)
+
+**3. Unit file** — `/etc/systemd/system/myhealthz.service`:
+
+```ini
+[Unit]
+Description=myhealthz MySQL/MariaDB health check sidecar
+Documentation=https://github.com/sriharip316/myhealthz
+# Soft ordering only: myhealthz tolerates the database being down at
+# startup, so it must NOT require mysql/mariadb.
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=myhealthz
+Group=myhealthz
+ExecStart=/usr/local/bin/myhealthz \
+    -listen :8080 \
+    -host 127.0.0.1 \
+    -port 3306 \
+    -user myhealthz \
+    -password-file /etc/myhealthz/db-password
+Restart=on-failure
+RestartSec=5s
+UMask=0077
+
+# Hardening — safe for this static, non-root, TCP/unix-socket-only binary.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**4. Start and verify**
+
+```console
+$ sudo systemctl daemon-reload
+$ sudo systemctl enable --now myhealthz
+$ curl -s http://127.0.0.1:8080/status
+$ journalctl -u myhealthz -f          # role transitions are logged here
+```
+
+Notes:
+
+- **Don't add `Requires=mysql.service` (or `mariadb.service`).** myhealthz
+  starts before the database on purpose and serves 503s until the first
+  check succeeds — a hard dependency would delay the health endpoint
+  exactly when it is needed, and tie myhealthz's lifecycle to the DB's.
+- `-listen :8080` binds **all interfaces** so a remote HAProxy can probe
+  it. Use `-listen 127.0.0.1:8080` if the prober runs on the same host,
+  or firewall the port.
+- **Unix socket mode:** replace `-host/-port` with
+  `-socket /run/mysqld/mysqld.sock` and give the service user access to
+  the socket via `SupplementaryGroups=mysql`. TLS is TCP-only, so socket
+  mode ignores the `-tls*` flags.
+- Change flags via a drop-in rather than editing the unit:
+  `sudo systemctl edit myhealthz`, add an empty `ExecStart=` line to reset
+  it, then the new `ExecStart=...`. Check the hardening with
+  `systemd-analyze security myhealthz.service`.
+
 ## Build
 
 ```console
